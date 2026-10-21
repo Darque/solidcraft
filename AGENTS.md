@@ -204,6 +204,19 @@ before the draft is verified.
   values never come from a commercial CAD product.
 - Build with `CARGO_TARGET_DIR=<repo>/target`. Windows: `cargo xwin build --release --target x86_64-pc-windows-msvc -p solidcraft`.
 
+### Session build and launch
+At the end of every session that updates upstream, changes application source, or carries the local
+customization forward, compile the integrated local branch with
+`cargo build --locked --release -p solidcraft`. After a successful build, start the app from that compiled source with
+`cargo run --locked --release -p solidcraft -- --sample`, leaving the app running for the user's
+local review. Use the same `CARGO_TARGET_DIR` for the build and launch; if the checkout's target
+directory is not writable, choose a writable target directory. Add `--control PORT` only when
+control-protocol access is needed, choosing a free port. Do not report the app as started unless the
+launch succeeds. If the build or launch fails, report the command and result. Include the branch,
+source revision, build result, launch status and whether tests were run in the session handoff. A
+successful build and launch are compilation/startup checks, not a substitute for requested tests or
+behavioral review.
+
 ## Roadmap
 `ROADMAP.md` (committed) tracks status, milestones and estimates. Update it whenever a
 milestone task lands. `docs/features.md` (SolidCraft's commands by area, from the registry) and
@@ -258,8 +271,14 @@ and keep its work separate from local customizations:
   existing network sinks and rechecking any new or changed dependency. If a new destination,
   unexplained payload, automatic upload, unsafe credential path or suspicious build/runtime action
   cannot be explained from the code, stop carrying the affected change forward and report the
-  evidence and uncertainty to the user. State the limits of static review; do not claim that it
-  proves all transitive dependencies or runtime behavior safe.
+  evidence and uncertainty to the user. If the review identifies anything concerning or possibly
+  malicious, do not compile or launch the app in that session; stop the update workflow and alert
+  the user with the evidence and uncertainty before proceeding. State the limits of static review;
+  do not claim that it proves all transitive dependencies or runtime behavior safe.
+- For each session that performs an upstream update or changes/carries forward application source,
+  complete the **Session build and launch** steps above after the source and local overlay are
+  integrated. Record the feature/source review, security review, build and launch outcomes together
+  in the handoff; refresh `LOCAL-SECURITY-BASELINE.md` when the reviewed source or overlay changes.
 - `origin` points to the user's GitHub fork, `https://github.com/Darque/solidcraft.git`; `upstream`
   points to the source project above. Verify both URLs before any push. Keep `main` aligned with
   `upstream/main`, and update the hosted fork's `main` only as part of the user's requested sync.
