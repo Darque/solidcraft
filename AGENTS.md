@@ -214,3 +214,60 @@ workflow; never regenerate them in a PR.
 Keep them conflict-free (CONTRIBUTING.md, "Lists many changes add to"): message catalogs sorted
 (`cargo xtask lists --fix`), `mod` lines in their sorted group, the language list English first
 then by id, generated files left to `main`, and a design-format change as one new file.
+
+## Local fork workflow (this checkout)
+
+This checkout is the user's experimental local customization of
+[`tangency-labs/solidcraft`](https://github.com/tangency-labs/solidcraft). The source project is
+authoritative whenever it already provides the requested behavior. Treat the source as upstream
+and keep its work separate from local customizations:
+
+- `upstream` points to `https://github.com/tangency-labs/solidcraft.git`. Keep it read-only.
+- `main` mirrors `upstream/main`; fetch the source and fast-forward this branch only. Do not add
+  local feature code or fork policy changes to `main`.
+- `local/solidcraft-personalizations` is the persistent local overlay branch. Keep each requested
+  customization isolated and reviewable there; use a dedicated `local/<topic>` branch when a
+  change needs independent development. Do not fold local changes into upstream commits.
+- Before implementing or carrying a customization forward, inspect the latest upstream code,
+  documentation and relevant history for the requested behavior. If upstream has implemented it,
+  use the upstream implementation and remove the duplicate local patch. If it has only implemented
+  part of the behavior, keep only the local portion that is still missing.
+- After fetching upstream, advance `main`, then update the local branch. Rebase committed local
+  changes onto `main`; if the work is still uncommitted, stash or save the diff before fast-forwarding
+  the local branch and then reapply it. Resolve conflicts with upstream behavior as the baseline,
+  and re-check the affected paths before rebuilding.
+- After each upstream update, summarize the source changes from the previous upstream base to the
+  new one before carrying local changes forward. Focus on user-visible feature changes and fixes:
+  group related work, name the important functions or modules touched, explain how their behavior
+  was added, expanded, improved, or debugged, and note relevant regression tests. Separate
+  generated files, assets, and broad refactors from behavior changes; do not dump a commit list.
+  State whether each existing local customization is still needed in light of upstream's changes.
+  Include the old and new upstream commit IDs and the build or validation result in the handoff.
+- After each upstream update, perform a source-level security and data-egress review before
+  carrying local changes forward. Compare the previous reviewed upstream commit with the new one,
+  and include the local overlay diff. Trace added or changed HTTP(S), browser/service-worker fetch,
+  raw socket, DNS, subprocess, update, crash-report, MCP/control, plugin, credential, and telemetry
+  paths through their callers and payloads. For each communication path, record its destination,
+  purpose, trigger (automatic or user-initiated), data sent, authentication/transport protections,
+  and whether it is local IPC or remote network traffic. Review changed direct dependencies and
+  build/install scripts for new communication behavior. Do not treat a URL string or generic search
+  match alone as evidence of malicious behavior; distinguish documented product features from
+  unexplained or unexpected egress. Maintain `LOCAL-SECURITY-BASELINE.md` with the reviewed source
+  commit, local overlay state, findings and audit limits. Once a baseline exists, focus each repeat
+  review on the upstream and local diffs since that baseline, while tracing changed call sites into
+  existing network sinks and rechecking any new or changed dependency. If a new destination,
+  unexplained payload, automatic upload, unsafe credential path or suspicious build/runtime action
+  cannot be explained from the code, stop carrying the affected change forward and report the
+  evidence and uncertainty to the user. State the limits of static review; do not claim that it
+  proves all transitive dependencies or runtime behavior safe.
+- `origin` points to the user's GitHub fork, `https://github.com/Darque/solidcraft.git`; `upstream`
+  points to the source project above. Verify both URLs before any push. Keep `main` aligned with
+  `upstream/main`, and update the hosted fork's `main` only as part of the user's requested sync.
+  Never publish a local feature branch or open a pull request to either repository unless the user
+  explicitly asks.
+- In GitHub Desktop, use this checkout (`/Users/phil/git/darque/solidcraft`), not the separate source
+  checkout, so the local changes and branch are visible together.
+- This is experimental work for local evaluation. A successful compile establishes that it builds;
+  it does not establish behavioral correctness or production readiness. Keep the changed files,
+  build result, branch and upstream commit visible in the handoff so the user can monitor the work
+  in GitHub Desktop.
