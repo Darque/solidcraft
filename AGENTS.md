@@ -217,6 +217,33 @@ source revision, build result, launch status and whether tests were run in the s
 successful build and launch are compilation/startup checks, not a substitute for requested tests or
 behavioral review.
 
+### Fork rebuild and publish
+
+A **rebuild** is a maintenance session that fetches upstream, carries the local overlay forward, or
+changes application source and produces a new local app build. Complete it in this order:
+
+1. Fetch `upstream/main`; summarize the source feature and function changes since the last reviewed
+   source commit, inspect the relevant local customizations for redundancy, and retain only local
+   behavior that upstream still lacks.
+2. Advance local `main` by fast-forwarding to `upstream/main`; rebase
+   `local/solidcraft-personalizations` onto it, then resolve and review the integrated diff.
+3. Review the upstream and overlay diffs for security and data egress. If anything concerning or
+   possibly malicious remains unexplained, stop: do not build, launch, commit or push; alert the user
+   with the evidence and uncertainty.
+4. Update `LOCAL-SECURITY-BASELINE.md`, then build into this checkout's `target` and start the built
+   app as described above. Do not publish a rebuild that failed to build or launch; report the
+   failure and leave the local changes available for repair.
+5. After a successful launch, commit the intended local overlay, workflow and review-report changes
+   on `local/solidcraft-personalizations`, push that branch to `origin`, and verify that the remote
+   branch points to the pushed commit. Pushing the local personalization branch is part of every
+   completed rebuild and does not need another prompt. If there is no change to publish, verify the
+   branch is already synchronized and report that no push was needed.
+6. Never push to `upstream`, push local changes to `main`, or open an upstream pull request without
+   a separate explicit request. If rebase changed the published overlay history, use a
+   `--force-with-lease` tied to the remote commit just fetched; never use an unqualified force push.
+   Include the upstream revision, local commit, verified remote commit, build, launch and test status
+   in the handoff.
+
 ## Roadmap
 `ROADMAP.md` (committed) tracks status, milestones and estimates. Update it whenever a
 milestone task lands. `docs/features.md` (SolidCraft's commands by area, from the registry) and
@@ -282,8 +309,9 @@ and keep its work separate from local customizations:
 - `origin` points to the user's GitHub fork, `https://github.com/Darque/solidcraft.git`; `upstream`
   points to the source project above. Verify both URLs before any push. Keep `main` aligned with
   `upstream/main`, and update the hosted fork's `main` only as part of the user's requested sync.
-  Never publish a local feature branch or open a pull request to either repository unless the user
-  explicitly asks.
+  The required `origin/local/solidcraft-personalizations` push after a successful rebuild is
+  governed by “Fork rebuild and publish” above. Do not push other local branches or open a pull
+  request to either repository unless the user separately asks.
 - In GitHub Desktop, use this checkout (`/Users/phil/git/darque/solidcraft`), not the separate source
   checkout, so the local changes and branch are visible together.
 - This is experimental work for local evaluation. A successful compile establishes that it builds;

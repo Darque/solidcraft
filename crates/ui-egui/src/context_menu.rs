@@ -722,6 +722,9 @@ fn occurrence_items(app: &SolveApp, path: &[u64]) -> Vec<Item> {
                 item.params = Some(json!({"component": placement.component, "occurrence": placement.occurrence, "path": path}));
                 item.enabled = app.session.active_occurrence_path.as_deref() != Some(path);
             }
+            "ui.newGroup" => {
+                item.params = Some(json!({"component": placement.component, "scope": crate::browser::occurrence_key(path)}));
+            }
             "occurrence.ground" => {
                 item.label = if placement.grounded { "Unground" } else { "Ground" }.into();
                 item.params = Some(json!({"occurrence": placement.occurrence, "grounded": !placement.grounded}));

@@ -28,9 +28,9 @@ pub(crate) fn reveal(app: &mut SolveApp, id: u64, body: &str) {
     app.ui.show_browser = true;
     app.preferences.timeline_left_browser_collapsed = false;
     app.tree.reveal = None;
-    app.tree.collapsed.remove("c0");
+    app.tree.expanded.insert("c0".into());
     for depth in 1..=path.len() {
-        app.tree.collapsed.remove(&occurrence_key(&path[..depth]));
+        app.tree.expanded.insert(occurrence_key(&path[..depth]));
     }
     let scope = if path.is_empty() { format!("c{component}") } else { occurrence_key(&path) };
     app.tree.expanded.insert(format!("{scope}/features"));

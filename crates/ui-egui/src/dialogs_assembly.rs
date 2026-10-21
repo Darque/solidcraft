@@ -1321,7 +1321,7 @@ pub fn browser_joints(app: &mut SolveApp, ui: &mut egui::Ui, depth: usize) {
     // `eye:Joints`, `row:<name>`). The folder's eye is its own: hiding it hides every joint's
     // glyph without changing each joint's eye.
     let key = "c0/joints";
-    let open = is_open(app, key, true);
+    let open = is_open(app, key, false);
     let folder_shown = !app.session.folder_hidden(key);
     let r = draw_row(
         ui,
@@ -1331,7 +1331,7 @@ pub fn browser_joints(app: &mut SolveApp, ui: &mut egui::Ui, depth: usize) {
     if r.eye {
         crate::browser::toggle_folder(app, key);
     } else if r.fold || r.clicked {
-        toggle(app, key, true);
+        toggle(app, key, false);
     }
     if !open {
         return;

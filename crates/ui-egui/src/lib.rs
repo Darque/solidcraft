@@ -691,6 +691,7 @@ impl SolveApp {
             "pick_bodies": self.ui.pick_bodies,
             "auto_project": self.session.auto_project,
             "visual_style": self.ui.visual_style,
+            "browser_tree_state_version": 1,
             "browser_collapsed": self.tree.collapsed,
             "browser_expanded": self.tree.expanded,
             "recent": self.home.recent,
@@ -739,8 +740,16 @@ impl SolveApp {
                 .map(|a| a.iter().take(10_000).filter_map(|x| x.as_str().map(str::to_string)).collect())
                 .unwrap_or_default()
         };
-        self.tree.collapsed = keys("browser_collapsed");
-        self.tree.expanded = keys("browser_expanded");
+        if v.get("browser_tree_state_version").and_then(Value::as_u64).is_some_and(|version| version >= 1) {
+            self.tree.collapsed = keys("browser_collapsed");
+            self.tree.expanded = keys("browser_expanded");
+        } else {
+            // Older preferences recorded open-by-default folders as collapsed and only retained
+            // explicit expansions for selected folders. The tree now starts fully closed, so
+            // discard those Browser overrides once while retaining the independent timeline folds.
+            self.tree.collapsed = keys("browser_collapsed").into_iter().filter(|key| key.starts_with("timeline_group:")).collect();
+            self.tree.expanded.clear();
+        }
         self.home.recent = v
             .get("recent")
             .and_then(Value::as_array)

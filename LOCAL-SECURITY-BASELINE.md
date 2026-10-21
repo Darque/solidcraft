@@ -1,18 +1,20 @@
 # Local Security and Data-Egress Baseline
 
-**Reviewed:** 2026-10-21  
-**Repository:** `/Users/phil/git/darque/solidcraft`  
-**Branch:** `local/solidcraft-personalizations`  
-**Upstream source commit:** `971b22324669281b504ee7a8b4657ae2df233012` (`upstream/main`)
-**Previous source base:** `cbac4eab3faa57a563fc7ba3b3be41390a06f47a`
-**Reviewed source range:** `cbac4eab..971b2232`
-**Current local overlay diff SHA-256 (excluding this report):** `d8b1843f28ad7c549b979cb356780e564c459e31278de74fa73cec5c3dbc5be2`
-**Build and launch (2026-10-21):** `CARGO_TARGET_DIR=/private/tmp/solidcraft-target cargo build --locked --release -p solidcraft` passed. `CARGO_TARGET_DIR=/private/tmp/solidcraft-target cargo run --locked --release -p solidcraft -- --sample` started PID 56552, which remained active at the last check. macOS logged LaunchServices/XPC warnings at startup; window visibility could not be verified through this interface. Tests were not run locally.
+- **Reviewed:** 2026-10-22
+- **Repository:** `/Users/phil/git/darque/solidcraft`
+- **Branch:** `local/solidcraft-personalizations`
+- **Upstream source commit:** `2fdc105d879e9932c876fc866ffb5844660f9f3d` (`upstream/main`)
+- **Previous source base:** `034aa60d474ce6fc75e9807eca3d02b647f845f5`
+- **Reviewed source range:** `034aa60d..2fdc105d`
+- **Current local overlay diff SHA-256 (excluding this report):** `cbe8faf72f1ec9ff898cea119fbcea16947e3c3ec5f62dff6d4988f5985b4847`
+- **Build and launch (2026-10-22):** The first build exposed a stale `orbit_snap` field reference in the rebased local navigation handler; that reference was removed because upstream now applies `view.navigate` immediately. The corrected `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo build --locked --release -p solidcraft` passed in 2m41s. The previous app process was stopped, and `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo run --locked --release -p solidcraft -- --sample` started successfully; startup reported Metal graphics with 4x MSAA and the process remained active at handoff. Window visibility could not be verified through this interface. Tests were not run.
 
-The hash is SHA-256 of the binary diff from `upstream/main` to the local overlay branch, excluding
-this report. It covers the local overlay: `AGENTS.md`, the trackpad navigation patch in
-`crates/ui-egui/src/navigation.rs` and `crates/ui-egui/src/viewport.rs`, and related documentation.
-The trackpad patch does not add communication behavior.
+The hash is SHA-256 of the binary diff from `upstream/main` to the local overlay working tree,
+excluding this report. It covers `AGENTS.md`, local navigation changes in
+`crates/ui-egui/src/navigation.rs` and `crates/ui-egui/src/viewport.rs`, Browser tree persistence
+and selection highlighting in `crates/ui-egui/src/browser.rs`, `browser/features.rs`,
+`dialogs_assembly.rs`, `context_menu.rs` and `lib.rs`, and related documentation. These local
+changes add no communication behavior.
 
 ## Summary
 
@@ -115,6 +117,114 @@ The new `.github/workflows/kernel-paused.yml` is the only new remote communicati
 
 The manifest change enables the existing workspace `log` package for `solidcraft-cli`; it adds no new package to the lockfile. No unexplained outbound behavior was found in the changed runtime paths or the local overlay.
 
+## Incremental source review (971b2232..034aa60d, 2026-10-21)
+
+### Feature changes
+
+- Release 0.18.3 advances the workspace and local crate versions. The lockfile only changes those
+  workspace package versions; no direct dependency was added or changed.
+- Format migration notes move from `crates/doc/src/format/pending/` to `v29/`. The migration
+  `face-pieces-by-place::step` marks existing features to retain their historical kernel-order
+  face-piece names while newly created features use stable spatial ordering. The
+  `align-to-planes` and `sheet-perforation-from-right` entries document new saved fields; older
+  designs need no transformation because the absent fields retain their prior behavior.
+- The local Browser patch changes disclosure defaults in `component_rows`, `occurrence_rows`,
+  `folder_rows_at`, `analysis_rows`, `canvas_rows`, feature rows, pattern rows and the joints folder
+  so the tree opens fully collapsed. `SolveApp::prefs` and `load_prefs` store the user's expanded
+  and collapsed keys in the existing app preference JSON; a one-time state-version migration clears
+  old open-by-default Browser overrides while retaining timeline group folds. This is user-level
+  application preference state, not data written into each `.solidcraft` design.
+- `Lit::of` now resolves selected body placement paths and highlights the body row when visible, or
+  the deepest visible component/occurrence parent when a disclosure branch, folder or group hides
+  it. `visible_parent_of_occurrence`, `body_row_visible` and `closest_component_row` implement that
+  mapping. A viewport selection does not expand the tree. `features::reveal` and the Browser
+  `reveal` flow explicitly open only the path needed for a user-requested Find in Browser action.
+- Upstream issue [#3005](https://github.com/tangency-labs/solidcraft/issues/3005) tracks viewport
+  selection not highlighting its Browser row. The open [PR #3081](https://github.com/tangency-labs/solidcraft/pull/3081)
+  expands to the selected body and scrolls it into view; that differs from the requested local
+  collapsed-ancestor highlight behavior, so the local behavior remains useful while the upstream
+  PR is unmerged. No separate issue for remembering the collapsed tree state was found during the
+  issue search.
+
+### Incremental security and data-egress findings
+
+The upstream source range changes only workspace version strings and three versioned format
+migration files. The one migration function edits in-memory JSON fields; it does not access files,
+network clients, processes or credentials. No new destination, HTTP(S) request, browser fetch,
+socket, subprocess, telemetry, upload behavior or direct dependency was introduced.
+
+The local Browser edits only read selection/document state, update the UI disclosure sets, and
+serialize those sets through the existing local preference mechanism. They add no network, file
+upload, subprocess, credential or telemetry path. The full overlay remains the pre-existing
+trackpad customization plus this UI behavior and its workflow/report documentation. No unexplained
+egress or concerning behavior was identified in the reviewed source or overlay diffs. This is a
+static diff review and does not establish transitive-dependency or runtime safety.
+
+## Incremental source review (034aa60d..2fdc105d, 2026-10-22)
+
+### Feature and function changes
+
+- Import and modeling: `iges_import`, `translate` and the connected-shell handling in
+  `crates/kernel/src/iges_in.rs` now keep disconnected lumps of a single IGES part as separate
+  solids, with importer regressions. `mirror` in `crates/engine/src/cmd/features.rs` now places
+  mirrored copies in the source component and follows the saved placement. The fuzzer accepts
+  chamfer material addition as it already did for fillets.
+- Sketch edits: command handlers in `crates/engine/src/cmd/sketch.rs` improve midpoint and snapped
+  center-circle selection; `trim_path`, `extend`, and offset-end handling in
+  `crates/engine/src/cmd/sketch_modify.rs` reject invalid offset endpoints instead of silently
+  undoing the operation. Regression cases were added for these paths.
+- Camera and input: `navigate`/`continuous` in `crates/engine/src/cmd/view_navigation.rs` and
+  camera methods in `crates/render/src/camera.rs` now apply view changes without the old camera
+  animation. The 3D mouse reader in `apps/solidcraft/src/space_mouse.rs` adds per-axis source and
+  speed mapping; `spacenavd.rs` and `hidraw.rs` read local daemon/device input, including
+  nonblocking polling and near-rest filtering.
+- Startup and desktop UI: `home::start_jobs`/`poll` move sample thumbnails and recent-file checks
+  off the window thread; `fonts::load_system_fonts_in_background` avoids blocking the first frame
+  on system CJK-font lookup; `window_fit::fit` handles restored Windows windows outside the
+  current monitor work area. The release also restyles `timeline_left` and adds the tokenized
+  history-strip widgets in `ui_kit/history.rs`, remembers the last sketch-tool variant, and
+  improves parameter suggestion insertion, Tab navigation, and tapped-hole custom sizing.
+- Issue reporting: `issue_report::Draft`, `draft_url`, and `show` replace the old report handoff
+  with editable summary, reproduction, expected-result, and technical-context fields. The app
+  opens a GitHub issue draft only on the user's **Continue on GitHub** click; short text is encoded
+  in the URL, and a long body is copied to the local clipboard while the URL carries only the
+  title. The user still reviews and submits the draft in GitHub.
+- Release and CLI: workspace version advances to 0.18.4. CLI help now writes usage to stdout and
+  exits successfully; the added Windows frame code handles monitor work areas. Dependency changes
+  add a Windows GDI API feature to the existing `windows-sys` package; no new package was added.
+
+### Local feature comparison
+
+- Upstream now supplies standard two-finger pan and pinch zoom. It does not add the local
+  Shift+two-finger orbit handler in `navigation.rs`/`viewport.rs`, so that trackpad overlay remains.
+  It also removed the old camera-animation `orbit_snap` state; the local handler now uses the
+  upstream immediate `view.navigate` path without referring to that removed field.
+- Upstream still opens Browser branches by default and does not persist this fork's new
+  fully-collapsed first-open preference or nearest-visible-component selection highlight. The
+  local changes in `browser.rs`, `browser/features.rs`, `dialogs_assembly.rs`, `lib.rs`, and
+  `context_menu.rs` remain necessary. The preference migration clears old Browser disclosure
+  overrides once while preserving timeline group folds; subsequent tree disclosure state remains
+  in application preferences. User-requested Find in Browser still opens the path it needs.
+- Group creation now writes the scoped keys that `folder_rows_at` actually reads, so a new group
+  opens in the selected folder or occurrence after the default-collapse change.
+
+### Incremental security and data-egress findings
+
+The source range changes 121 files and advances release/workspace versions, but adds no new
+dependency package, telemetry service, automatic crash upload, or unexplained remote destination.
+The changed 3D mouse support reads `/sys/class/hidraw`, `/dev/hidrawN`, and the local Unix socket
+`/run/spnav.sock` or `/var/run/spnav.sock`; it sends no data to an Internet host. Startup thumbnail
+and recent-file work is local. CI's pinned build/cache actions run on GitHub-hosted infrastructure,
+not in the desktop app. The issue-report browser handoff is explicit and may disclose the user-edited
+report title/body to GitHub when the draft URL is opened; for long reports, the body is copied to the
+clipboard and stays local until the user pastes/submits it. Existing updater, configured AI/ACP,
+browser asset, and optional MCP/control communication paths remain as documented above.
+
+The added-line review found only test subprocess launches, local spacenavd socket setup, and the
+user-triggered `ctx.open_url` report handoff among new communication/process sinks. No suspicious
+credential collection or unexplained transfer was identified. This is static source review; it does
+not audit every transitive dependency or prove runtime behavior.
+
 ## Review method and limits
 
 - Searched Rust, JavaScript, TypeScript, and manifests for HTTP clients, browser fetch, sockets,
@@ -131,6 +241,14 @@ The manifest change enables the existing workspace `log` package for `solidcraft
 - Compared `cbac4eab..971b2232`: inspected the changed control server/MCP, off-thread job, logger,
   navigation, STEP/IGES import, tessellation, and GitHub Actions paths; checked added manifests and
   scanned added lines for network clients, destinations, subprocesses, credentials and telemetry.
+- Compared `971b2232..034aa60d`: inspected all five changed paths, the three v29 migration entries
+  and manifest/lockfile changes; searched the range for network clients, URLs, sockets, subprocesses,
+  credentials, telemetry and uploads. Reviewed the local Browser selection and preference diff for
+  external communication paths.
+- Compared `034aa60d..2fdc105d`: reviewed the IGES import, sketch command, mirror, camera/navigation,
+  3D mouse, startup/font, report-handoff and Windows window-fit changes; checked dependency diffs and
+  searched added Rust/TOML/YAML lines for network clients, URL opens, sockets, subprocesses,
+  credentials, telemetry and upload paths.
 - Compared the local overlay to `971b2232` after merging and confirmed its only behavior patch is
   the Shift+two-finger orbit addition alongside upstream's held-arrow controls.
 - This was not a full line-by-line audit of all vendored/transitive dependency source, a software
@@ -142,7 +260,8 @@ The manifest change enables the existing workspace `log` package for `solidcraft
 ## Conclusion
 
 No unexplained or apparently malicious outbound transfer was identified in the reviewed source
-through `971b2232`.
+through `2fdc105d` or in the local overlay. This remains a static, scoped review rather than a
+complete audit of all dependencies or runtime behavior.
 SolidCraft's ordinary CAD work is local, but AI use, issue sharing, updater checks/installs, web-app
 delivery, and explicitly configured remote MCP/API endpoints cross the machine boundary as described
 above. The largest data-sharing choice is the optional AI integration; the largest local trust
