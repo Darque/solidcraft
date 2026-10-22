@@ -3,18 +3,16 @@
 - **Reviewed:** 2026-10-22
 - **Repository:** `/Users/phil/git/darque/solidcraft`
 - **Branch:** `local/solidcraft-personalizations`
-- **Upstream source commit:** `2fdc105d879e9932c876fc866ffb5844660f9f3d` (`upstream/main`)
-- **Previous source base:** `034aa60d474ce6fc75e9807eca3d02b647f845f5`
-- **Reviewed source range:** `034aa60d..2fdc105d`
-- **Current local overlay diff SHA-256 (excluding this report):** `cbe8faf72f1ec9ff898cea119fbcea16947e3c3ec5f62dff6d4988f5985b4847`
-- **Build and launch (2026-10-22):** The first build exposed a stale `orbit_snap` field reference in the rebased local navigation handler; that reference was removed because upstream now applies `view.navigate` immediately. The corrected `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo build --locked --release -p solidcraft` passed in 2m41s. The previous app process was stopped, and `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo run --locked --release -p solidcraft -- --sample` started successfully; startup reported Metal graphics with 4x MSAA and the process remained active at handoff. Window visibility could not be verified through this interface. Tests were not run.
+- **Upstream source commit:** `6c60f1a9ed1fe61bc5cd8390e49e74b0655e72d5` (`upstream/main`)
+- **Previous source base:** `2fdc105d879e9932c876fc866ffb5844660f9f3d`
+- **Reviewed source range:** `2fdc105d..6c60f1a9`
+- **Current local overlay diff SHA-256 (excluding this report):** `3b8242a975e26dc47a701b0e29a79c0cb0220e7b14dfbb52cf216431532db0f8`
+- **Build and launch (2026-10-22):** `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo build --locked --release -p solidcraft` succeeded in 3m18s. Started `./target/release/solidcraft --sample`; startup reported Metal graphics with 4x MSAA, and process 74404 remained active. Process inspection found this was the only running SolidCraft process. Tests were not run.
 
 The hash is SHA-256 of the binary diff from `upstream/main` to the local overlay working tree,
-excluding this report. It covers `AGENTS.md`, local navigation changes in
-`crates/ui-egui/src/navigation.rs` and `crates/ui-egui/src/viewport.rs`, Browser tree persistence
-and selection highlighting in `crates/ui-egui/src/browser.rs`, `browser/features.rs`,
-`dialogs_assembly.rs`, `context_menu.rs` and `lib.rs`, and related documentation. These local
-changes add no communication behavior.
+excluding this report. It covers the fork workflow, trackpad navigation changes, Browser tree
+persistence and selection highlighting, and related documentation. These local changes add no
+communication behavior.
 
 ## Summary
 
@@ -225,6 +223,68 @@ user-triggered `ctx.open_url` report handoff among new communication/process sin
 credential collection or unexplained transfer was identified. This is static source review; it does
 not audit every transitive dependency or prove runtime behavior.
 
+## Incremental source review (2fdc105d..6c60f1a9, 2026-10-22)
+
+Upstream advanced 11 commits to release 0.19.0. Across 182 changed files, the update contains
+several user-visible behavior changes, a large UI-kit/layout refactor, 14 additional official theme
+files and localization/generated updates. The behavior changes reviewed include:
+
+- Navigation in `crates/ui-egui/src/navigation.rs` adds the opt-in `free_orbit` preference to
+  `view.navigate` and shares the setting across mouse, trackpad and 3D-mouse camera paths.
+  `view.normal_to` aligns the camera with a selected planar face or datum plane. The view-change
+  glide is restored for view changes while orbit, pan and zoom remain immediate. In the underlying
+  `immediate_wheel` input path, two-finger movement still pans and pinch zooms; upstream does not
+  route Shift+two-finger movement to orbit.
+- Chamfer validation in `crates/kernel/src/blend.rs::chamfer_tool_sides` now checks whether the
+  far side of an expanded cutter reaches nearby material. It rejects chamfers that would bite a
+  neighboring wall; upstream adds a regression case for a pin in a socket.
+- Current-view DXF export now includes profile curves from shown sketches. The new
+  `view_dxf_sketch.rs` functions `exportable`, `profile_curve`, `curve_parts` and `parts` collect
+  visible sketch runs, while `view_dxf::export` adds the `SKETCH` layer and reports its entity
+  count. Hidden curves use the hidden layer when dashed export is enabled; construction and
+  reference geometry is excluded.
+- `sketch.dimension` in `crates/engine/src/cmd/sketch.rs::dimension` accepts `name = expression`
+  to define a user parameter and use it for the dimension. The expression definition parser and
+  `Document::param_name_problem` checks reject malformed, reserved or duplicate names, and the
+  dimension response reports the defined parameter.
+- Empty-root cuts are made consistent between preview and execution through
+  `Session::cut_takes_every_body` in `crates/engine/src/cmd/features.rs`.
+- The workspace version advances to 0.19.0. The compact workspace layout and shared UI container
+  components change app-shell and panel rendering; a new static `xtask ui-containers` checker and
+  CI invocation enforce UI structure. Fourteen official theme palettes and related locale, docs
+  and asset updates are mostly presentation/catalog changes rather than new runtime services.
+
+### Local feature comparison
+
+The local Shift+two-finger orbit remains necessary: upstream supports pan and pinch zoom but has no
+Shift gesture routing in `immediate_wheel`. Upstream's new free-orbit preference is related camera
+behavior and does not replace the requested Fusion 360 trackpad binding.
+
+The local Browser changes also remain necessary. Upstream's `browser.rs` still calls `is_open(...,
+true)` for component, occurrence, folder, group and pattern branches; its saved UI preferences do
+not migrate the initial tree to fully collapsed. The fork continues to default the tree to
+collapsed, remember disclosure choices across runs, highlight the selected component or occurrence,
+and resolve a selection hidden by a collapsed branch to the nearest visible parent. The local group
+creation scope adjustment remains paired with collapsed-by-default state. No redundant local
+implementation was found in these reviewed areas.
+
+### Incremental security and data-egress findings
+
+The source range adds no general-purpose network client, telemetry service, automatic crash upload,
+or unexplained remote destination. The manifest/lock changes add `proc-macro2` and `syn` support to
+the `xtask` static UI-container checker; they do not add a runtime network dependency. The new
+`xtask/src/web_offline_test.rs` TCP listener binds to `127.0.0.1` for its opt-in offline browser
+harness, serves local build files and coordinates a local headless Chrome test. It is a development
+tool, not a desktop-app listener or outbound transfer. The changed agent-chat UI connects only after
+the user activates the control and uses the already configured API endpoint or installed ACP agent;
+this is the existing optional integration, not a new destination.
+
+The added-line scan found no unexpected credential reads, telemetry endpoints, or automatic data
+uploads. Existing updater, configured AI/ACP, browser asset, issue-sharing and optional MCP/control
+paths retain the purposes and destinations documented in the baseline above. No concerning or
+possibly malicious change was identified, so the rebuild may proceed. This is a static source review;
+it does not prove the safety of transitive dependencies or runtime behavior.
+
 ## Review method and limits
 
 - Searched Rust, JavaScript, TypeScript, and manifests for HTTP clients, browser fetch, sockets,
@@ -232,9 +292,13 @@ not audit every transitive dependency or prove runtime behavior.
 - Traced the native update client, browser service worker/font fetch, AI API and ACP-agent paths,
   MCP/control listeners, issue-report flow, local crash storage, and 3D mouse integration to their
   callers and destinations.
-- Compared the source update from `b168750f` to `fc3dedfd`, checked the changed dependency
+- Compared the initial source update from `b168750f` to `fc3dedfd`, checked the changed dependency
   manifests/lockfile, and inspected the local trackpad/documentation overlay for communication
   changes.
+- Compared `2fdc105d..6c60f1a9`: reviewed navigation/free-orbit and normal-to-selection, chamfer
+  cutter validation, sketch-parameter definitions, empty-root cuts, sketch-aware DXF export, the
+  compact UI/theme changes, changed dependencies and CI, plus the local navigation and Browser
+  overlay. Traced the new loopback test harness and user-triggered agent-chat connection.
 - Compared `9b801634..cbac4eab`: inspected `anchor_frame.rs`, `dialogs.rs`, their regression tests,
   and scanned changed source, manifests, and CI files for network, subprocess, credential, telemetry,
   or upload changes.
@@ -260,7 +324,7 @@ not audit every transitive dependency or prove runtime behavior.
 ## Conclusion
 
 No unexplained or apparently malicious outbound transfer was identified in the reviewed source
-through `2fdc105d` or in the local overlay. This remains a static, scoped review rather than a
+through `6c60f1a9` or in the local overlay. This remains a static, scoped review rather than a
 complete audit of all dependencies or runtime behavior.
 SolidCraft's ordinary CAD work is local, but AI use, issue sharing, updater checks/installs, web-app
 delivery, and explicitly configured remote MCP/API endpoints cross the machine boundary as described
