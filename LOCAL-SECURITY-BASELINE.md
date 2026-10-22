@@ -1,13 +1,13 @@
 # Local Security and Data-Egress Baseline
 
-- **Reviewed:** 2026-10-22
+- **Reviewed:** 2026-10-23
 - **Repository:** `/Users/phil/git/darque/solidcraft`
 - **Branch:** `local/solidcraft-personalizations`
-- **Upstream source commit:** `6c60f1a9ed1fe61bc5cd8390e49e74b0655e72d5` (`upstream/main`)
-- **Previous source base:** `2fdc105d879e9932c876fc866ffb5844660f9f3d`
-- **Reviewed source range:** `2fdc105d..6c60f1a9`
-- **Current local overlay diff SHA-256 (excluding this report):** `3b8242a975e26dc47a701b0e29a79c0cb0220e7b14dfbb52cf216431532db0f8`
-- **Build and launch (2026-10-22):** `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo build --locked --release -p solidcraft` succeeded in 3m18s. Started `./target/release/solidcraft --sample`; startup reported Metal graphics with 4x MSAA, and process 74404 remained active. Process inspection found this was the only running SolidCraft process. Tests were not run.
+- **Upstream source commit:** `030187452ab71e44e31d9ea25c3d8aa70eb760ee` (`upstream/main`)
+- **Previous source base:** `6c60f1a9ed1fe61bc5cd8390e49e74b0655e72d5`
+- **Reviewed source range:** `6c60f1a9..03018745`
+- **Current local overlay diff SHA-256 (excluding this report):** `c55edf727956773015cf7a57b518510660f68926c79bdee5b7360b7c0195b134`
+- **Build and launch (2026-10-23):** `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo build --locked --release -p solidcraft` succeeded in 3m16s. Started `./target/release/solidcraft --sample`; startup reported Metal graphics with 4x MSAA, and process 14838 remained active. Process inspection found this was the only running SolidCraft process. Tests were not run.
 
 The hash is SHA-256 of the binary diff from `upstream/main` to the local overlay working tree,
 excluding this report. It covers the fork workflow, trackpad navigation changes, Browser tree
@@ -285,6 +285,80 @@ paths retain the purposes and destinations documented in the baseline above. No 
 possibly malicious change was identified, so the rebuild may proceed. This is a static source review;
 it does not prove the safety of transitive dependencies or runtime behavior.
 
+## Incremental source review (6c60f1a9..03018745, 2026-10-23)
+
+Upstream advanced 19 commits (17 non-merge commits) to release 0.20.0. The range changes 172 files
+(13,732 insertions and 2,864 deletions), with substantial File-view, Preferences, rendering and
+performance work. The user-visible and functional changes reviewed include:
+
+- The Start page becomes a File view. `home::show` and its action dispatch now provide navigation
+  for new/open/recover/save/export, design properties, settings, shortcuts and help. Shared
+  `ui_kit::FileView` components replace much of the bespoke start-page layout while retaining the
+  open design and its history.
+- Preferences are reorganized into General, Interface, Design, Navigation, Graphics, Sketch,
+  Assistant and Plugins sections using new `ui_kit::preferences` components. The split pages retain
+  controls for the existing navigation preset, two-finger pan/zoom and free-orbit options. They do
+  not add Shift+two-finger orbit routing.
+- `Document::next_item_id` and `Document::allocate_id`, with the `doc::format::read` migration,
+  establish a single monotonic identity counter across features, browser/timeline groups, canvases,
+  joints, contact sets, studies and exploded views. Browser, timeline and assembly command handlers
+  now use it so deleting an auxiliary item does not allow its ID to be reused after saving/reopening.
+- Construction axes can now be saved as references for circular patterns and revolve/surface
+  revolve operations. `engine::cmd::features::axis_line` resolves the named axis geometry and
+  records `axis_feature`; the v31 document migration preserves older construction-axis references.
+  Editing an offset plane so that it depends on itself is rejected by `edit::redefine`, and sketch
+  fillet/chamfer commands reject offset corners that would otherwise leave invalid circular edges.
+- Joint driving avoids reevaluating unchanged model geometry; contact-sweep meshes are cached by
+  geometry key. Imported mesh vertex/triangle arrays use shared `Arc` storage to avoid duplicating
+  large scans when copying documents.
+- Rendering now culls out-of-view placements of instanced meshes, shares their GPU triangle buffers,
+  and selects display-only levels of detail using `geom::simplify::levels` and a pixel-error bound.
+  The separate GPU picking buffer was removed in favor of per-body BVH picking. New
+  `gpu::view::oit` passes improve order-independent transparency for glass/see-through surfaces.
+  Large-mesh vertex welding is faster and starts before the first frame; face hover highlighting
+  persists as the pointer moves over the face. Ribbon tab lists are cached rather than rebuilt on
+  each frame.
+- On Windows, `space_mouse::windows_hid::multi_axis_controllers` asks Plug and Play for HID usage
+  metadata and opens only interfaces identified as 3D mice. This avoids repeatedly querying
+  unrelated keyboards, mice and touchscreens for device strings. The changes in `space_mouse.rs`
+  keep macOS discovery on hidapi and use the new targeted path on Windows.
+- Release/workspace versions advance to 0.20.0. UI-kit labels, the redesigned preferences and File
+  view receive catalog, icon and documentation updates; these are primarily presentation and
+  localization changes.
+
+### Local feature comparison
+
+Upstream still routes two-finger trackpad movement to pan (or zoom when that preference is off) and
+pinch to zoom. The local Shift+two-finger orbit handler is absent from upstream's
+`navigation::immediate_wheel`, so it remains necessary. The local Browser tree still opens collapsed
+by default, persists its disclosure state and highlights viewer selections at the nearest visible
+ancestor; upstream's component, occurrence, folder, group and pattern rows still default to open.
+No duplicate local behavior was found. The Preferences redesign keeps the existing trackpad-pan
+setting and does not replace the local gesture or Browser changes.
+
+### Incremental security and data-egress findings
+
+No new network client, remote destination, telemetry integration, automatic upload or credential
+path was found in the source diff. The changed manifests enable Windows Configuration Manager/HID
+API features for the new device scan and add `proc-macro2` as a UI-kit development dependency; these
+packages/APIs do not introduce a runtime network service. The added-line sink scan found no new
+socket, HTTP client, browser fetch, process launch or URL-open path. Its matches were local process
+IDs used in test fixtures, removal of the former Start-page issue/release hyperlinks, and GPU buffer
+"uploads" (local device-memory transfers).
+
+The Windows HID scan reads local Plug and Play interface properties, selects the Generic Desktop
+Multi-Axis Controller usage, and opens only those candidate device paths. It sends no Internet
+request and reads no unrelated HID device strings. The agent-chat change in `lib.rs` calls
+`agent_chat::poll` while the File view is open so a detection task already started from the optional
+Assistant panel/settings can finish and update its UI. It does not start a new scan there; the
+existing discovery path can run a local configured agent's `--version` probe, and an agent session
+starts only after the existing user action. The existing optional AI/API, updater, issue-sharing,
+web-asset and MCP/control paths remain as documented above and their destinations are unchanged in
+this range.
+
+No concerning or possibly malicious change was identified. This is a scoped static review; it is not
+a full audit of transitive dependency source or a runtime packet-capture assessment.
+
 ## Review method and limits
 
 - Searched Rust, JavaScript, TypeScript, and manifests for HTTP clients, browser fetch, sockets,
@@ -299,6 +373,11 @@ it does not prove the safety of transitive dependencies or runtime behavior.
   cutter validation, sketch-parameter definitions, empty-root cuts, sketch-aware DXF export, the
   compact UI/theme changes, changed dependencies and CI, plus the local navigation and Browser
   overlay. Traced the new loopback test harness and user-triggered agent-chat connection.
+- Compared `6c60f1a9..03018745`: reviewed the File view and Preferences redesign, monotonic document
+  IDs and v31 migration, construction-axis features, joint/contact evaluation, mesh sharing/LOD/
+  culling/transparency/picking changes and Windows HID discovery. Checked changed manifests and
+  dependencies, scanned added sink calls, traced local HID access and existing agent discovery, and
+  rechecked that local trackpad and Browser behaviors remain absent upstream.
 - Compared `9b801634..cbac4eab`: inspected `anchor_frame.rs`, `dialogs.rs`, their regression tests,
   and scanned changed source, manifests, and CI files for network, subprocess, credential, telemetry,
   or upload changes.
@@ -324,7 +403,7 @@ it does not prove the safety of transitive dependencies or runtime behavior.
 ## Conclusion
 
 No unexplained or apparently malicious outbound transfer was identified in the reviewed source
-through `6c60f1a9` or in the local overlay. This remains a static, scoped review rather than a
+through `03018745` or in the local overlay. This remains a static, scoped review rather than a
 complete audit of all dependencies or runtime behavior.
 SolidCraft's ordinary CAD work is local, but AI use, issue sharing, updater checks/installs, web-app
 delivery, and explicitly configured remote MCP/API endpoints cross the machine boundary as described
