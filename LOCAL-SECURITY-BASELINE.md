@@ -409,3 +409,143 @@ SolidCraft's ordinary CAD work is local, but AI use, issue sharing, updater chec
 delivery, and explicitly configured remote MCP/API endpoints cross the machine boundary as described
 above. The largest data-sharing choice is the optional AI integration; the largest local trust
 boundary is the selected ACP agent executable.
+
+## Rebuild review (03018745..1bbc5ab0, 2026-10-24)
+
+Upstream moved from 0.20.0 to 0.21.0-rc.2 in 114 commits. The source range changes 301 files
+(18,984 insertions and 1,352 deletions). The review focused on behavioral changes and changed runtime
+sinks; generated locales, icons, license inventories and broad refactors are not listed individually.
+
+### Source feature and function changes
+
+- **Fusion navigation (#3446):** `navigation::immediate_wheel` now distinguishes Shift-modified,
+  bracketed trackpad movement from ordinary two-finger pan. `navigation::handle` routes that motion
+  to `orbit` only for the Fusion preset while trackpad pan is enabled. It excludes other modifiers,
+  clamps finite deltas, preserves the pivot during a gesture, avoids pan/zoom drift, and leaves other
+  presets' scroll behavior intact. `prefs::navigation` and the UI-tour help explain the binding.
+  Upstream added focused tests for Shift orbit, normal pan, switching modifiers mid-gesture, other
+  presets, 2D pages, popup overlays, invalid deltas and post-gesture drift.
+- **Browser and design navigation:** upstream's `browser::Lit::of`, `Lit::placement` and row helpers
+  now highlight selected bodies and their containing branches, as well as hovered geometry. The
+  `SolveApp::prefs`/`load_prefs` path now saves expanded and collapsed Browser keys. Browser feature
+  menus gained Rename/Delete, a second Document Settings click closes the window, and selection
+  ranges and timeline reordering were improved. The tree still uses open-by-default disclosure
+  calls, and a selection hidden below a collapsed branch marks its ancestors as a branch rather
+  than selecting the nearest visible component row.
+- **Frames and sheet metal:** new `doc::frame` and `engine::cmd::frame` modules add a frame-profile
+  library, frame members along sketch lines, profile dimensions/anchors and a Frame Member dialog.
+  `dialogs_frame` and its command handlers expose the workflow. Flat Pattern now draws perforations;
+  sheet-metal bend/hem and conversion handling were corrected for edge picks and direction.
+- **Sketches and modeling:** the two-point circle dialog accepts a typed diameter; sketch point and
+  symmetry constraints better retain snapped/axis positions; offset-source lines remain free to
+  rotate, with an explicit Break Offset Association path. Circular sketch-pattern quantity
+  expressions survive edits. Extrude preserves holes in nested profile loops and handles inserted
+  parts; expression parsing accepts a leading `=`. Intersect refuses a result that would remove the
+  entire body. Rectangular/circular patterns report copies that miss the source body. Rename, delete,
+  edit and import paths add validation or preserve references, names, transforms and options where
+  prior code could lose them.
+- **Assemblies and analysis:** `engine::cmd::motion_trace` adds sampled motion traces and regenerates
+  retained curves only when inputs change. Joint placement/evaluation reuses cached work and avoids
+  redundant analysis. Whole-design measurement runs on a copy off the window thread. A component
+  can be extracted to its own linked design; the component command/serialization paths handle the
+  new relationship. Document format migrations v32-v34 add motion-trace references, reserved body
+  names and circular-pattern quantity expressions.
+- **Formats, rendering and reliability:** the shared format registry consolidates extensions and
+  import/export options. DXF preserves a Bézier's own degree; FreeCAD/Rhino imports decode detailed
+  caps with larger bounds and retain import transforms. The renderer reuses still scenes, draws the
+  viewport in a 1x pass, handles empty tessellation plans and lost GPU devices, and avoids sending
+  unchanged ground shadows through transparency work. `device_lost::restart` starts the same
+  application again after a reported device loss, optionally using the software renderer. The
+  Windows and macOS shells gained targeted device handling and a native macOS menu bar.
+- **Interaction and documentation:** design tabs reorder by dragging; timeline features can move
+  across the history marker and be deleted as ranges; constraint drags and keyboard shortcut
+  assignments have more consistent behavior. The CLI adds the opt-in `bench-assistant` workflow.
+  The release workflow makes Snap failure non-blocking. Workspace version is 0.21.0-rc.2. Locale,
+  theme, icon and documentation updates accompany these features.
+
+### Local customization comparison and implementation quality
+
+- The earlier local navigation patch routed Shift+two-finger movement to orbit across every
+  non-Touchpad preset and worked independently of the `trackpad_pan` setting. Upstream #3446 is
+  scoped to the Fusion preset and the existing trackpad-pan setting, filters Shift combined with
+  other modifiers, rejects non-finite motion and clamps deltas. Its tests cover gesture continuity
+  and preset isolation. The local patch had broader effects than requested and lacked those explicit
+  input guards, so the upstream implementation is the better fit and the local navigation, viewport
+  and duplicate documentation changes were removed.
+- Upstream now provides the right Browser foundation: one `Lit` model for selection/hover and its
+  existing `collapsed`/`expanded` preference sets for persistence. The local patch reuses those
+  structures rather than adding another persistence store. It changes Browser row defaults to
+  collapsed, migrates pre-versioned preferences once so old open-by-default state does not reopen
+  the tree, and extends `Lit` to select the nearest visible component/occurrence when a body or
+  occurrence row is hidden. It also keeps Find in Browser's explicit path reveal and preserves the
+  correct disclosure scope for occurrence-specific grouping. These pieces are not replaced by
+  upstream's branch markers or saved disclosure keys. The design is reasonably localized to the
+  existing Browser architecture; this rebuild does not run the local Browser behavior tests, so
+  compile/startup evidence alone does not prove those interaction cases.
+- The integrated overlay now changes only `AGENTS.md`, this baseline, and the Browser-related UI
+  files. No local trackpad implementation remains.
+
+### Incremental security and data-egress findings
+
+The source diff adds no telemetry or crash-report upload service and no unexplained automatic
+Internet request. New/changed communication paths reviewed:
+
+- **Anthropic-compatible Assistant endpoint:** the new `Kind::Anthropic`/`Protocol::Anthropic` path
+  extends the existing user-configured API-agent feature. On activation it can request the endpoint's
+  model list; the connection-test action sends a small `Hello` request; a user-sent chat message
+  sends the prompt, bounded conversation history, assistant instructions and available tool schemas.
+  If the user attaches a view image, the image is included. Model tool results can contain queried
+  design details and are returned to that same endpoint. The default destination is
+  `https://api.anthropic.com/v1`; compatible endpoints can be configured by the user. API keys stay
+  in the system keychain, are allowed only over HTTPS or to loopback, and requests do not follow
+  redirects. The desktop client uses the platform certificate verifier, request timeouts and a
+  16 MiB response limit. A no-key custom endpoint may use HTTP if the user explicitly configures it.
+  This is intentional optional egress; it can carry chat and design-derived information to the
+  selected provider and is not started as background telemetry.
+- **Assistant benchmark CLI:** `solidcraft-cli bench-assistant` is an explicit command. Its control
+  connection rejects non-loopback addresses and requires the app's token; its scripted benchmark
+  creates fresh designs, sets the benchmark agent to full tool permissions, and sends test prompts
+  through the user-supplied model endpoint. Optional `--json`/`--markdown` outputs are written only
+  to the user-named local path. It does not select or upload an existing saved design. The remote
+  model traffic follows the user-configured API endpoint above; the CLI-to-app control channel is
+  local TCP.
+- **MCP skill reference:** the new read-only `skill_reference` tool returns an exact-name, compile-time
+  embedded allowlist of shipped skill documents. It does not open arbitrary filesystem paths or
+  initiate a network request. An MCP client may relay the returned text through its own configured
+  agent conversation.
+- **Local process behavior:** an API agent starts the existing `solidcraft-cli mcp` process against
+  the app's loopback control endpoint. The new GPU-loss recovery path starts a copy of the current
+  SolidCraft executable with its existing arguments and, when requested, the software-renderer
+  environment setting. Neither path targets an external service. Existing browser asset, update,
+  issue-report, MCP/control and ACP-agent paths remain as previously described; this range did not
+  add another destination for them.
+- **Dependencies and automation:** the direct runtime dependency added is `muda` for the macOS native
+  menu bar; it adds no application network service. Other changed dependency entries support platform
+  APIs, test/runtime rendering and the 0.21 changes. The release workflow only makes Snap packaging
+  failures non-blocking; it adds no new workflow upload or secret use.
+
+No concerning or possibly malicious behavior was identified in the reviewed upstream or local diffs.
+This is a source-level review: it is not a full audit of transitive dependency source, a dependency
+vulnerability scan, packet capture, or proof of runtime safety.
+
+## Current reviewed state
+
+- Reviewed upstream base: `1bbc5ab0f78ec0ccc4e1e64acb84bc0fc6f553b7` (0.21.0-rc.2).
+- The local navigation customization is retired in favor of upstream #3446.
+- The Browser overlay still supplies the collapsed initial tree and nearest-visible selected-row
+  behavior; upstream now supplies disclosure persistence and ordinary row/branch selection markers.
+- Security review found expected user-directed assistant traffic and local IPC only; no unexplained
+  egress.
+
+### Build and launch outcome
+
+- `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo build --locked --release -p solidcraft`
+  succeeded. Cargo reported `Finished release profile` after 4m12s.
+- `CARGO_TARGET_DIR=/Users/phil/git/darque/solidcraft/target cargo run --locked --release -p solidcraft -- --sample`
+  started successfully. The app reported Metal graphics with MSAA 4x and remains running.
+- Startup restored an unsaved `Untitled` recovery alongside the sample tab. The app showed the
+  recovery notice; it was left untouched. The visible Browser had the root row expanded and its
+  child folders closed, which is consistent with a saved disclosure state. No interaction was
+  performed to verify a fresh/default tree or selection fallback.
+- Tests were not run. The source PR includes regression tests for #3446, but this rebuild was a
+  compile/startup check; local Browser interaction cases remain unverified in this run.
