@@ -215,7 +215,9 @@ control-protocol access is needed, choosing a free port. Do not report the app a
 launch succeeds. If the build or launch fails, report the command and result. Include the branch,
 source revision, build result, launch status and whether tests were run in the session handoff. A
 successful build and launch are compilation/startup checks, not a substitute for requested tests or
-behavioral review.
+behavioral review. If startup opens a recovery design, unsaved work, or another user document, leave
+it untouched and report what opened; do not dismiss, alter, or save it unless the user asks. Distinguish
+the state restored at startup from a fresh-install or default-state behavior check.
 
 ### Fork rebuild and publish
 
@@ -224,7 +226,12 @@ changes application source and produces a new local app build. Complete it in th
 
 1. Fetch `upstream/main`; summarize the source feature and function changes since the last reviewed
    source commit, inspect the relevant local customizations for redundancy, and retain only local
-   behavior that upstream still lacks.
+   behavior that upstream still lacks. When upstream and a local patch address the same feature,
+   compare actual behavior, architectural integration, edge-case handling and available regression
+   coverage. Explain what each implementation does better or leaves uncovered, then prefer upstream
+   when it fully meets the request and is at least as maintainable. Remove duplicate local behavior;
+   retain only a clearly identified remaining gap. Record the comparison and the reason for the
+   merge/removal/retention decision in the handoff.
 2. Advance local `main` by fast-forwarding to `upstream/main`; rebase
    `local/solidcraft-personalizations` onto it, then resolve and review the integrated diff.
 3. Review the upstream and overlay diffs for security and data egress. If anything concerning or
@@ -282,6 +289,13 @@ and keep its work separate from local customizations:
   was added, expanded, improved, or debugged, and note relevant regression tests. Separate
   generated files, assets, and broad refactors from behavior changes; do not dump a commit list.
   State whether each existing local customization is still needed in light of upstream's changes.
+  When upstream has implemented a feature that also exists in the local overlay, compare the
+  implementations at the relevant functions/modules: behavior and scope, integration with existing
+  code, guards and edge cases, and regression tests. State whether upstream covers the full user
+  request, any remaining behavior gap, and which implementation is preferable with evidence. Do not
+  claim one is “best” without explaining the observed tradeoffs. Remove a redundant local patch and
+  preserve only behavior still missing upstream. Keep this comparison in the handoff so future
+  sessions can see why the overlay was retained or retired.
   Include the old and new upstream commit IDs and the build or validation result in the handoff.
 - After each upstream update, perform a source-level security and data-egress review before
   carrying local changes forward. Compare the previous reviewed upstream commit with the new one,
@@ -306,6 +320,14 @@ and keep its work separate from local customizations:
   complete the **Session build and launch** steps above after the source and local overlay are
   integrated. Record the feature/source review, security review, build and launch outcomes together
   in the handoff; refresh `LOCAL-SECURITY-BASELINE.md` when the reviewed source or overlay changes.
+  If the running app restores an unsaved design or other recovery state, preserve it for the user and
+  report it separately from the sample design used to start the app. A remembered UI state observed
+  in that session does not by itself establish the default state for a new document or fresh profile.
+- If a session changes only maintenance instructions or a review report, with no upstream update or
+  application-source change, validate the documentation diff, commit it to
+  `local/solidcraft-personalizations`, push it to `origin`, and verify the remote commit. Such a
+  documentation-only change does not require an application build or launch. If upstream or
+  application source changed, use the full rebuild workflow above.
 - `origin` points to the user's GitHub fork, `https://github.com/Darque/solidcraft.git`; `upstream`
   points to the source project above. Verify both URLs before any push. Keep `main` aligned with
   `upstream/main`, and update the hosted fork's `main` only as part of the user's requested sync.
